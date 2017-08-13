@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Tour Map</title>
+    <meta name="viewport" content="initial-scale=1.0">
+    <meta charset="utf-8">
+    <style>
+      /* Always set the map height explicitly to define the size of the div
+       * element that contains the map.asf as sfadsfewrad asdfa */
+      #map {
+        height: 100%;
+      }
+      /* Optional: Makes the sample page fill the window. */
+      html, body {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
+      #legend {
+        font-family: Arial, sans-serif;
+        font-size: 4em;
+        background: #fff;
+        padding: 10px;
+        margin: 10px;
+        /*border: 3px solid #000;*/
+      }
+      #legend h3 {
+        margin-top: 0;
+      }
+      #legend img {
+        vertical-align: middle;
+      }
+      #cycledstyle {
+        display: inline-block;
+        width: 120px;
+      }
+      #daystyle {
+        display: inline-block;;
+        width: 60px;
+      }
+
+      .slideShow {
+        max-width: 100%;
+        max-height: 100%;
+        display: block;
+        margin: auto;
+      }
+
+      img {
+        opacity: 1;
+        transition: opacity 0.3s;
+      }
+
+      img[data-src] {
+        opacity: 0;
+      }
+      </style>
+  </head>
+  <body>
+    <div id="map"></div>
+    <div id="legend">
+      <!-- <h3>Info</h3> -->
+      <div>
+        Total distance cycled:
+        <div id="cycledstyle"><span id="cycled">0</span></div>
+      </div>
+      <div>
+        Day:
+        <div id="daystyle"><span id="day">1</span></div>
+      </div>
+    </div>
+    <script>
+      var map;
+      var marker;
+      var cyclingData;
+      var actionIndex = 0;
+      var delay = 50;
+      var delayBeforeImage = 750;
+      var delayAfterImage = 750;
+      var delayImage = 4000;
+      var tourPath;
+      var flightPlanCoordinates = [];
+
+      function initMap() {
+        map = new google.maps.Map(document.getElementById('map'), {
+          center: {lat: 44.2124056, lng: 12.570344},
+          zoom: 6
+        });
+
+        map.controls[google.maps.ControlPosition.RIGHT_BOTTOM].push(document.getElementById('legend'));
+
+        // var div = document.createElement('div');
+        // div.innerHTML = 'Total distance cycled';
+        // legend.appendChild(div);
+
+        tourPath = new google.maps.Polyline({
+          path: flightPlanCoordinates,
+          geodesic: true,
+          strokeColor: '#FF0000',
+          strokeOpacity: 1.0,
+          strokeWeight: 2
+        });
+        tourPath.setMap(map);
+
+        //let url = 'http://haiduc32.go.ro/cluj2barcelona.json';
+        let url = '<!-- activity file -->';
+
+        fetchOmni(url)
+        .then(res => res.json())
+        .then((out) => {
+          cyclingData = out;
+          console.log('Data JSON loaded!');
+          coord = {lat: out[0].Lat, lng: out[0].Lon};
+          marker = new google.maps.Marker({
+            position: coord,
+            map: map,
+            title: 'cycling'
+          });
+
+          flightPlanCoordinates.push(coord);
+          tourPath.setPath(flightPlanCoordinates);
+
+          actionIndex++;
+
+          //once the page is loaded, give it time for the user to start tracking
+          setTimeout(tick, 3000);
+        })
+        .catch(err => console.error(err));
+
+      }
+
+      function tick() {
+        if (cyclingData[actionIndex] == undefined) return;
+        coord = {lat: cyclingData[actionIndex].Lat, lng: cyclingData[actionIndex].Lon};
+        marker.setPosition(coord);
+
+        flightPlanCoordinates.push(coord);
+        tourPath.setPath(flightPlanCoordinates);
+
+        document.getElementById('cycled').innerHTML = Math.round(cyclingData[actionIndex].TotalDistance);
+        document.getElementById('day').innerHTML = cyclingData[actionIndex].Day;
+
+        camp = cyclingData[actionIndex].Type == "camp";
+
+        if (camp) {
+          //create a new polyline
+          flightPlanCoordinates = [];
+          tourPath = new google.maps.Polyline({
+            path: flightPlanCoordinates,
+            geodesic: true,
+            strokeColor: '#FF0000',
+            strokeOpacity: 1.0,
+            strokeWeight: 3
+          });
+          tourPath.setMap(map);
+
+          campMarker = new google.maps.Marker({
+            position: coord,
+            map: map,
+            title: 'cycling',
+            icon: 'https://maps.gstatic.com/mapfiles/ms2/micons/campground.png'
+          });
+
+          actionIndex++;
+          setTimeout(tick, 1000);
+        } else if (cyclingData[actionIndex].Type == "picture") {
+          //show the picture
+          // first we need a delay before showing the picture
+          // then we show the picutre and have adelay
+          // then we should hide the picture, and have another delay
+          setTimeout(function () {
+            //show the picture here
+            // TODO: code here
+            showImageWithTimeout();
+
+          }, delayBeforeImage);
+        } else {
+          actionIndex++;
+          setTimeout(tick, delay);
+        }
+      }
+
+      function showImageWithTimeout() {
+        showImage(cyclingData[actionIndex].Image);
+
+        setTimeout(function () {
+          // hide the picture here
+          hideImage();
+
+          actionIndex++;
+          // if next action is also a picture, then show it now
+          if (cyclingData[actionIndex] != undefined && cyclingData[actionIndex].Type == "picture")
+          {
+            showImageWithTimeout();
+          } else {
+            //continue to the next action
+
+            setTimeout(tick, delayAfterImage);
+          }
+        }, delayImage)
+      }
+
+      function showImage(fileName) {
+        var div = document.createElement('div');
+        div.style.borderStyle = 'none';
+        div.style.borderWidth = '0px';
+        div.style.position = 'absolute';
+        div.id = 'imageDiv';
+
+        div.style.left = '10px';
+        div.style.top = '10px';
+        div.style.width = (document.documentElement.clientWidth - 20) + 'px';
+        div.style.height = (document.documentElement.clientHeight - 20) + 'px';
+
+        // Create the img element and attach it to the div.
+        var img = document.createElement('img');
+        // img.style.width = '100%';
+        // img.style.height = '100%';
+        //img.style.position = 'absolute';
+        img.className = 'slideShow';
+        img.setAttribute('data-src', 'a');
+        //img.style.opacity = 0;
+        img.onload = function() {
+          img.removeAttribute('data-src');
+        };
+        img.src = "images/resized/" + fileName;
+        div.appendChild(img);
+
+        document.body.appendChild(div);
+
+        // Add the element to the "overlayLayer" pane.
+        //var panes = this.getPanes();
+        //panes.overlayLayer.appendChild(div);
+      }
+
+      function hideImage() {
+        var div = document.getElementById('imageDiv');
+        document.body.removeChild(div);
+      }
+
+      function fetchOmni(url) {
+        return new Promise(function(resolve, reject) {
+          var xhr = new XMLHttpRequest
+          xhr.onload = function() {
+            resolve(new Response(xhr.responseText, {status: xhr.status}))
+          }
+          xhr.onerror = function() {
+            reject(new TypeError('Local request failed'))
+          }
+          xhr.open('GET', url)
+          xhr.send(null)
+        })
+      }
+
+    </script>
+    <script src="<!-- Google Maps API Key -->"
+    async defer></script>
+  </body>
+</html>
